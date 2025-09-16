@@ -1,45 +1,46 @@
-name: Deploy Taskflow Pro
+name: Deploy to EC2
 
 on:
   push:
     branches:
-      - main   # jab main branch pe push ho to deploy chale
+      - main   # sirf main branch push par chalega
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout code
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      # 1. Checkout source code
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # 2. Create tarball using git archive
-      - name: Create clean tarball
-        run: git archive --format=tar.gz -o repo.tar.gz HEAD
-
-      # 3. Setup SSH
-      - name: Setup SSH
+      # 2. Setup SSH agent with private key
+      - name: Setup SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      # 4. Upload tarball to server
-      - name: Upload tarball to server
-        run: scp -o StrictHostKeyChecking=no repo.tar.gz ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/repo.tar.gz
+      # 3. Create repo tarball
+      - name: Package project
+        run: |
+          tar --exclude='.git' -czf repo.tar.gz .
 
-      # 5. Extract and restart app
+      # 4. Copy repo to EC2 server
+      - name: Upload repo to server
+        run: |
+          scp -o StrictHostKeyChecking=no repo.tar.gz \
+          ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/repo.tar.gz
+
+      # 5. Deploy on EC2
       - name: Deploy on server
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-          set -e
-          cd /opt/taskflow-pro || mkdir -p /opt/taskflow-pro && cd /opt/taskflow-pro
-
-          echo "📦 Extracting code..."
-          tar -xzf /tmp/repo.tar.gz -C /opt/taskflow-pro
-          rm -f /tmp/repo.tar.gz
-
-          echo "🐳 Restarting containers..."
-          docker compose down
-          docker compose up -d --build
-          EOF
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+            set -e
+            cd /tmp
+            rm -rf repo || true
+            mkdir repo
+            tar -xzf repo.tar.gz -C repo
+            cd repo
+            docker compose down
+            docker compose up -d --build
+          "
