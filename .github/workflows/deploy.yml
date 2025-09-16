@@ -1,0 +1,53 @@
+name: CI/CD - TaskFlow Pro
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      deploy_type:
+        description: 'Choose deploy type: ip or domain'
+        required: true
+        default: 'ip'
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Archive repo for transfer
+        run: |
+          tar -czf repo.tar.gz .
+
+      - name: Copy to EC2
+        run: |
+          scp -o StrictHostKeyChecking=no repo.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/
+      
+      - name: Remote deploy (run on EC2)
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} <<'EOF'
+          set -e
+          cd /home/${USER:-ubuntu}
+          # extract
+          tar -xzf repo.tar.gz -C .
+          cd taskflow-pro || true
+          # create backend env file from secrets if not present
+          cat > backend/.env.local <<EOL
+          MONGO_URI=${MONGO_URI}
+          JWT_SECRET=${JWT_SECRET}
+          PORT=5000
+          EOL
+          # Build & run with docker-compose
+          docker-compose down || true
+          docker-compose up -d --build
+          EOF
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}

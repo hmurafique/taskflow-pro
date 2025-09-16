@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:6
+    container_name: taskflow_mongo
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - taskflow-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../backend/Dockerfile
+    container_name: taskflow_backend
+    env_file:
+      - ./backend/.env.local
+    depends_on:
+      - mongo
+    networks:
+      - taskflow-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../frontend/Dockerfile
+    container_name: taskflow_frontend
+    depends_on:
+      - backend
+    networks:
+      - taskflow-net
+
+ # nginx:
+    #image: nginx:alpine
+    #container_name: taskflow_nginx
+    #depends_on:
+     # - frontend
+      #- backend
+    #ports:
+     # - "80:80"
+      #- "443:443"
+    #volumes:
+     # - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      #- ./certbot/www:/var/www/certbot
+      #- ./certbot/conf:/etc/letsencrypt
+    #networks:
+     # - taskflow-net
+
+  #certbot:
+   # image: certbot/certbot
+    #container_name: taskflow_certbot
+    #volumes:
+     # - ./certbot/www:/var/www/certbot
+     # - ./certbot/conf:/etc/letsencrypt
+    #entrypoint: >
+     # sh -c "trap exit TERM; while :; do
+      #certbot renew --webroot -w /var/www/certbot --quiet;
+      #sleep 12h & wait $${!};
+      #done"
+
+volumes:
+  mongo_data:
+
+networks:
+  taskflow-net:
+    driver: bridge
