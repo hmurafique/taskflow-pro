@@ -36,7 +36,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
           set -e
-          cd /home/${USER}/apps/taskflow_pro || mkdir -p /home/${USER}/apps/taskflow_pro && cd /home/${USER}/apps/taskflow_pro
+          cd /home/${USER}/deployment/taskflow_pro || mkdir -p /home/${USER}/deployment/taskflow_pro && cd /home/${USER}/deployment/taskflow_pro
 
           # cleanup old files
           rm -rf backend frontend devops docker-compose.yml
